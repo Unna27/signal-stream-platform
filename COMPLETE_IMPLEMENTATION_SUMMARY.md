@@ -316,6 +316,7 @@ Response: { success, data: SignalStatistics, message }
 ### Signal Strength Chart
 
 - Doughnut chart with 3 categories
+- Color-coded by strength
 - 300px height
 - Interactive tooltips
 
@@ -388,6 +389,7 @@ docker run -p 4200:4200 signal-dashboard
 
 ### Rendering
 
+- Zoneless change detection (Angular 20)
 - Incremental chart updates
 - Responsive sizing
 
@@ -396,6 +398,7 @@ docker run -p 4200:4200 signal-dashboard
 - [ ] Export data (CSV/JSON)
 - [ ] Advanced filtering
 - [ ] Custom alerts
+- [ ] Multi-stream comparison
 - [ ] Performance metrics
 - [ ] User authentication
 - [ ] Data aggregation endpoints
@@ -432,6 +435,13 @@ cd signal-dashboard && npm start
 Modify services to return mock data for offline testing
 
 ## 📞 Support Resources
+
+### Documentation Files
+
+1. `SETUP_GUIDE.md` - Installation & configuration
+2. `DASHBOARD_README.md` - Feature documentation
+3. `DASHBOARD_IMPLEMENTATION.md` - Implementation details
+4. `API_GATEWAY_IMPLEMENTATION.md` - Backend documentation
 
 ### Troubleshooting
 
