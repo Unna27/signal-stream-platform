@@ -1,98 +1,181 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 🚀 Real-Time Signal Processing Platform
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A scalable, event-driven microservices platform that simulates real-time signal ingestion, processing, storage, and live visualization using modern distributed system design patterns.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 📌 Overview
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+This project demonstrates how to build a real-time data pipeline using **event streaming architecture**. Signals are continuously produced, processed asynchronously, stored in a database, and streamed live to a frontend dashboard without page refresh.
 
-## Project setup
+The system is designed with **loose coupling, scalability, and fault tolerance** in mind.
 
-```bash
-$ npm install
+---
+
+## 🏗️ Architecture
+
+```
+Python Producer
+      ↓
+Kafka (raw-signals)
+      ↓
+Signal Processor (NestJS)
+      ↓
+Kafka (processed-signals)
+      ↓
+Storage Service (NestJS)
+      ↓
+PostgreSQL
+      ↓
+API Gateway (NestJS)
+   ├── REST API (historical data)
+   └── WebSocket (live stream)
+      ↓
+Angular Dashboard
 ```
 
-## Compile and run the project
+---
+
+## ⚙️ Tech Stack
+
+### Backend
+
+- **Node.js** (NestJS microservices)
+- **NestJS**
+- **Apache Kafka** (event streaming)
+- **KafkaJS**
+- **PostgreSQL**
+
+### Producer
+
+- Python (signal simulation)
+- **kafka-python**
+
+### Frontend
+
+- **Angular**
+- **Socket.IO**
+- **Chart.js**
+
+### DevOps / Tools
+
+- **Docker**
+- Kafka UI (topic inspection & debugging)
+
+---
+
+## 🔄 Key Features
+
+- ⚡ Real-time event streaming using Kafka
+- 🔁 Asynchronous microservices communication
+- 📡 Live dashboard updates via WebSockets
+- 📊 Historical + real-time data visualization
+- 📦 Scalable consumer groups with parallel processing
+- 🛑 Dead Letter Queue (DLQ) for failed message handling
+- 🐳 Fully containerized local development setup
+
+---
+
+## 🧠 Core Concepts Implemented
+
+- Event-driven architecture
+- Microservices with message queues
+- Kafka topics, partitions, and consumer groups
+- Offset management and replay capability
+- Fault tolerance with retry & DLQ pattern
+- Real-time UI streaming
+
+---
+
+## ▶️ Getting Started
+
+### 1. Start infrastructure
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+docker-compose up -d
 ```
 
-## Run tests
+This starts:
+
+- Kafka + Zookeeper
+- PostgreSQL
+
+---
+
+### 2. Start backend services
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm run start:signal-processor
+npm run start:storage-service
+npm run start:api-gateway
 ```
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 3. Start Python producer
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+cd producer-python
+source venv/bin/activate   # or venv\Scripts\activate (Windows)
+python producer.py
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Resources
+### 4. Start Angular dashboard
 
-Check out a few resources that may come in handy when working with NestJS:
+```bash
+cd signal-dashboard
+ng serve
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Open:
 
-## Support
+```
+http://localhost:4200
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+---
 
-## Stay in touch
+## 📡 Data Flow
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+1. Producer generates signal events every few seconds
+2. Events are published to Kafka (`raw-signals`)
+3. Signal processor enriches and forwards events
+4. Storage service persists data into PostgreSQL
+5. API Gateway:
+   - Serves historical data via REST
+   - Streams live updates via WebSocket
 
-## License
+6. Angular dashboard updates in real time
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+---
+
+## 🛠️ Future Improvements
+
+- 📊 Advanced analytics service (aggregations, trends)
+- ☸️ Kubernetes deployment
+- 🔐 Authentication & authorization
+
+---
+
+## 📸 Demo
+
+![Signal Dashboard Image](/assets/SignalStreamDashboard.png 'Signal Dashboard Image')
+
+---
+
+## 💡 Why this project?
+
+This project showcases real-world backend engineering skills:
+
+- Designing scalable distributed systems
+- Building event-driven microservices
+- Handling real-time data streams
+- Integrating backend with live frontend dashboards
+
+---
+
+## 📬 Contact
+
+Feel free to connect if you'd like to discuss system design, Kafka, or backend architecture.
