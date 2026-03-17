@@ -1,0 +1,161 @@
+<div class="dashboard-container">
+  <!-- Header -->
+  <div class="dashboard-header">
+    <h1>Signal Stream Dashboard</h1>
+    <div class="header-info">
+      <div
+        class="connection-status"
+        [style.background-color]="getConnectionStatusColor()"
+      >
+        {{ isConnected ? 'Connected' : 'Disconnected' }}
+      </div>
+      <span class="last-update"
+        >Last Update: {{ currentSignal?.processedAt | date: 'medium' }}</span
+      >
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls-section">
+    <div class="time-range-buttons">
+      <button
+        *ngFor="let range of ['today', '24h', '7d', '30d']"
+        (click)="changeTimeRange(range)"
+        [class.active]="selectedTimeRange === range"
+        class="btn btn-range"
+      >
+        {{
+          range === 'today'
+            ? 'Today'
+            : range === '24h'
+              ? '24H'
+              : range === '7d'
+                ? '7 Days'
+                : '30 Days'
+        }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Live Signal Info -->
+  <div class="live-signal-section" *ngIf="currentSignal">
+    <h2>Live Signal Data</h2>
+    <div class="signal-info-grid">
+      <div class="info-card">
+        <p class="label">Signal ID</p>
+        <p class="value">{{ currentSignal.id }}</p>
+      </div>
+      <div class="info-card">
+        <p class="label">Original Value</p>
+        <p class="value">{{ currentSignal.value.toFixed(4) }}</p>
+      </div>
+      <div class="info-card">
+        <p class="label">Processed Value</p>
+        <p class="value">{{ currentSignal.processedValue.toFixed(4) }}</p>
+      </div>
+      <div class="info-card">
+        <p class="label">Strength</p>
+        <p
+          class="value"
+          [style.color]="getStrengthColor(currentSignal.strength)"
+        >
+          {{ currentSignal.strength | uppercase }}
+        </p>
+      </div>
+      <div class="info-card">
+        <p class="label">Timestamp</p>
+        <p class="value small">
+          {{ currentSignal.timestamp | date: 'medium' }}
+        </p>
+      </div>
+      <div class="info-card">
+        <p class="label">Processed At</p>
+        <p class="value small">
+          {{ currentSignal.processedAt | date: 'medium' }}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics Section -->
+  <div class="statistics-section">
+    <h2>Statistics</h2>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <p class="stat-label">Total Signals</p>
+        <p class="stat-value">{{ stats.count }}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Avg Original Value</p>
+        <p class="stat-value">{{ stats.avgValue.toFixed(3) }}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Avg Processed Value</p>
+        <p class="stat-value">{{ stats.avgProcessedValue.toFixed(3) }}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Min Value</p>
+        <p class="stat-value">{{ stats.minValue.toFixed(3) }}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Max Value</p>
+        <p class="stat-value">{{ stats.maxValue.toFixed(3) }}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Signals/Sec</p>
+        <p class="stat-value">{{ stats.signalsPerSecond }}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Weak Signals</p>
+        <p class="stat-value" style="color: #ef4444">{{ stats.weakCount }}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Medium Signals</p>
+        <p class="stat-value" style="color: #f59e0b">{{ stats.mediumCount }}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Strong Signals</p>
+        <p class="stat-value" style="color: #10b981">{{ stats.strongCount }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts Section -->
+  <div class="charts-section">
+    <div class="chart-container">
+      <div style="position: relative; height: 400px; width: 100%">
+        <canvas
+          #valueChart
+          baseChart
+          [type]="'line'"
+          [data]="signalValueChartData"
+          [options]="signalValueChartOptions"
+        ></canvas>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <div style="position: relative; height: 300px; width: 100%">
+        <canvas
+          #strengthChart
+          baseChart
+          [type]="'doughnut'"
+          [data]="signalStrengthChartData"
+          [options]="signalStrengthChartOptions"
+        ></canvas>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <div style="position: relative; height: 300px; width: 100%">
+        <canvas
+          #rateChart
+          baseChart
+          [type]="'line'"
+          [data]="signalsPerSecondChartData"
+          [options]="signalsPerSecondChartOptions"
+        ></canvas>
+      </div>
+    </div>
+  </div>
+</div>
