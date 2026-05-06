@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { KafkaService } from 'my-kafka/kafka';
+import { KafkaConfigService } from 'my-shared/shared';
 import { EachMessagePayload } from 'kafkajs';
 
 interface Signal {
@@ -17,11 +18,16 @@ interface ProcessedSignal extends Signal {
 @Injectable()
 export class SignalProcessorService implements OnModuleInit {
   private readonly logger = new Logger(SignalProcessorService.name);
-  private readonly inputTopic = process.env.SIGNAL_INPUT_TOPIC || 'raw-signals';
-  private readonly outputTopic =
-    process.env.SIGNAL_OUTPUT_TOPIC || 'processed-signals';
+  private readonly inputTopic: string;
+  private readonly outputTopic: string;
 
-  constructor(private readonly kafkaService: KafkaService) {}
+  constructor(
+    private readonly kafkaService: KafkaService,
+    private readonly kafkaConfig: KafkaConfigService,
+  ) {
+    this.inputTopic = this.kafkaConfig.inputTopic;
+    this.outputTopic = this.kafkaConfig.outputTopic;
+  }
 
   async onModuleInit() {
     this.logger.log('Starting signal processor consumer...');
@@ -31,7 +37,8 @@ export class SignalProcessorService implements OnModuleInit {
   private async startConsuming() {
     await this.kafkaService.subscribe(
       this.inputTopic,
-      this.handleMessage.bind(this),
+      (messagePayload: EachMessagePayload) =>
+        this.handleMessage(messagePayload),
     );
   }
 

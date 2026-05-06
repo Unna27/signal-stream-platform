@@ -4,7 +4,15 @@ import {
   OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
-import { Kafka, Consumer, Producer, EachMessagePayload, Admin } from 'kafkajs';
+import {
+  Kafka,
+  Consumer,
+  Producer,
+  EachMessagePayload,
+  Admin,
+  Partitioners,
+} from 'kafkajs';
+import { KafkaConfigService } from 'my-shared/shared';
 
 @Injectable()
 export class KafkaService implements OnModuleInit, OnModuleDestroy {
@@ -16,24 +24,34 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
   private readonly numPartitions = 2; // Configure for 2 partitions
   private readonly replicationFactor = 1;
 
-  constructor(private readonly groupId: string = 'signal-processor-group') {
+  constructor(
+    private readonly groupId: string = 'signal-processor-group',
+    private readonly kafkaConfig: KafkaConfigService,
+  ) {
     this.kafka = new Kafka({
       clientId: 'signal-stream-platform',
-      brokers: [process.env.KAFKA_BROKER || 'localhost:9092'],
+      brokers: [this.kafkaConfig.broker],
     });
   }
 
   async onModuleInit() {
     this.admin = this.kafka.admin();
     this.consumer = this.kafka.consumer({ groupId: this.groupId });
-    this.producer = this.kafka.producer();
+    // Use the legacy partitioner to keep previous partitioning behaviour
+    this.producer = this.kafka.producer({
+      createPartitioner: Partitioners.LegacyPartitioner,
+    });
 
     await this.admin.connect();
+
+    // Ensure topics exist before the producer connects so metadata is accurate
+    await this.createTopicsIfNotExists();
+
+    // Log topic metadata (partitions/leaders) to help debug "does not host this topic-partition"
+    await this.logTopicMetadata();
+
     await this.producer.connect();
     await this.consumer.connect();
-
-    // Initialize topics with 2 partitions for parallel processing
-    await this.createTopicsIfNotExists();
 
     this.logger.log(
       `✓ KafkaService initialized with groupId: ${this.groupId} (${this.numPartitions} partitions per topic)`,
@@ -52,9 +70,9 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
    */
   private async createTopicsIfNotExists(): Promise<void> {
     const topics = [
-      'raw-signals',
-      'processed-signals',
-      'storage-signals-failed',
+      this.kafkaConfig.inputTopic, // 'raw-signals',
+      this.kafkaConfig.outputTopic, // 'processed-signals',
+      this.kafkaConfig.failedTopic, // 'storage-signals-failed',
     ];
 
     try {
@@ -94,6 +112,31 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(
         `Topic creation warning (may already exist): ${error.message}`,
       );
+    }
+  }
+
+  /**
+   * Fetch and log partition/leader info for configured topics to aid debugging
+   */
+  private async logTopicMetadata(): Promise<void> {
+    try {
+      const topics = [
+        this.kafkaConfig.inputTopic, // 'raw-signals',
+        this.kafkaConfig.outputTopic, // 'processed-signals',
+        this.kafkaConfig.failedTopic, // 'storage-signals-failed',
+      ];
+      const metadata = await this.admin.fetchTopicMetadata({ topics });
+
+      metadata.topics.forEach((t) => {
+        this.logger.log(`Topic metadata: ${t.name}`);
+        t.partitions.forEach((p) => {
+          this.logger.log(
+            ` - partition ${p.partitionId} leader: ${p.leader} replicas: ${p.replicas.join(',')}`,
+          );
+        });
+      });
+    } catch (err) {
+      this.logger.warn(`Failed to fetch topic metadata: ${err.message}`);
     }
   }
 

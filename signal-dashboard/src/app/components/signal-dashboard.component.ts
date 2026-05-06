@@ -283,9 +283,10 @@ export class SignalDashboardComponent implements OnInit, OnDestroy {
           if (response.success && Array.isArray(response.data)) {
             this.historicalSignals = response.data.map((s) => ({
               ...s,
-              timestamp: Number(s.timestamp),
+              timestamp: new Date(s.timestamp).getTime(),
               value: Number(s.value),
               processedValue: Number(s.processedValue),
+              processedAt: new Date(s.processedAt).getTime(),
             }));
             console.info(
               `Loaded ${this.historicalSignals.length} historical signals`,

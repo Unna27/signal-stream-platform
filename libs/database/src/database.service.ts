@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { Pool } from 'pg';
+import { DatabaseConfigService } from 'my-shared/shared';
 
 interface ProcessedSignal {
   id: string;
@@ -12,16 +13,16 @@ interface ProcessedSignal {
 
 @Injectable()
 export class DatabaseService implements OnModuleInit {
-  private pool: Pool;
+  private pool!: Pool;
   private readonly logger = new Logger(DatabaseService.name);
 
-  constructor() {
+  constructor(private readonly dbConfig: DatabaseConfigService) {
     this.pool = new Pool({
-      user: process.env.DB_USER || 'user',
-      host: process.env.DB_HOST || 'localhost',
-      database: process.env.DB_NAME || 'signal-stream-platform',
-      password: process.env.DB_PASSWORD || 'pass',
-      port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 5434,
+      user: this.dbConfig.user ?? '',
+      host: this.dbConfig.host ?? 'localhost',
+      database: this.dbConfig.name ?? '',
+      password: this.dbConfig.password ?? '',
+      port: this.dbConfig.port ?? 5432,
     });
   }
 
@@ -133,6 +134,9 @@ export class DatabaseService implements OnModuleInit {
   async insertProcessedSignal(signal: ProcessedSignal): Promise<void> {
     // Validate signal before inserting
     const validation = this.validateSignal(signal);
+    console.log(
+      `Validating signal ${signal.id}: ${validation.valid ? 'valid' : 'invalid'}, signal.processedAt=${signal.processedAt}, signal.timestamp=${signal.timestamp}`,
+    );
     if (!validation.valid) {
       throw new Error(
         `Signal validation failed: ${validation.errors.join(', ')}`,
@@ -154,10 +158,10 @@ export class DatabaseService implements OnModuleInit {
         [
           signal.id,
           signal.value,
-          signal.timestamp,
+          new Date(signal.timestamp),
           signal.processedValue,
           signal.strength,
-          signal.processedAt,
+          new Date(signal.processedAt),
         ],
       );
 
@@ -202,13 +206,14 @@ export class DatabaseService implements OnModuleInit {
   ): Promise<ProcessedSignal[]> {
     const client = await this.pool.connect();
     try {
+      console.log(startTimestamp, endTimestamp);
       const result = await client.query(
         `SELECT signal_id as id, value, timestamp, processed_value as "processedValue",
                 strength, processed_at as "processedAt"
          FROM processed_signals
          WHERE timestamp >= $1 AND timestamp <= $2
          ORDER BY timestamp DESC;`,
-        [startTimestamp, endTimestamp],
+        [new Date(startTimestamp), new Date(endTimestamp)],
       );
 
       return result.rows;

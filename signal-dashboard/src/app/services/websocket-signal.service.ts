@@ -39,16 +39,17 @@ export class WebsocketSignalService {
         reconnectionAttempts: 10,
         transports: ['websocket', 'polling'],
       });
-
+      console.log('Attempting to connect to signal gateway at:', url);
+      console.log('Socket instance created:', this.socket);
       this.socket.on('connected', (data: any) => {
-        console.log('Connected to signal gateway:', data);
+        console.log('Connected to signal gateway:', JSON.stringify(data));
         this.connectionStatusSubject.next(true);
         observer.next(true);
         observer.complete();
       });
 
       this.socket.on('signal', (signal: ProcessedSignal) => {
-        console.log('Received signal:', signal);
+        console.log('Received signal:', JSON.stringify(signal));
         this.signalSubject.next(signal);
 
         // Add to history (keep last 100 signals)

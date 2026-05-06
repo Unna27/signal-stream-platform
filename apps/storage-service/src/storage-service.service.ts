@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { KafkaService } from 'my-kafka/kafka';
 import { DatabaseService } from 'my-db/database';
+import { KafkaConfigService } from 'my-shared/shared';
 import { EachMessagePayload } from 'kafkajs';
 
 interface ProcessedSignal {
@@ -15,17 +16,19 @@ interface ProcessedSignal {
 @Injectable()
 export class StorageServiceService implements OnModuleInit {
   private readonly logger = new Logger(StorageServiceService.name);
-  private readonly outputTopic =
-    process.env.SIGNAL_OUTPUT_TOPIC || 'processed-signals';
-  private readonly failedSignalsTopic =
-    process.env.SIGNAL_FAILED_TOPIC || 'storage-signals-failed';
+  private readonly outputTopic: string;
+  private readonly failedSignalsTopic: string;
   private storedCount = 0;
   private errorCount = 0;
 
   constructor(
     private readonly kafkaService: KafkaService,
     private readonly databaseService: DatabaseService,
-  ) {}
+    private readonly kafkaConfig: KafkaConfigService,
+  ) {
+    this.outputTopic = this.kafkaConfig.outputTopic;
+    this.failedSignalsTopic = this.kafkaConfig.failedTopic;
+  }
 
   async onModuleInit() {
     this.logger.log('Starting storage service consumer...');
@@ -36,7 +39,8 @@ export class StorageServiceService implements OnModuleInit {
     try {
       await this.kafkaService.subscribe(
         this.outputTopic,
-        this.handleProcessedSignal.bind(this),
+        (messagePayload: EachMessagePayload) =>
+          this.handleProcessedSignal(messagePayload),
       );
       this.logger.log(
         `✓ Successfully subscribed to topic: ${this.outputTopic}`,

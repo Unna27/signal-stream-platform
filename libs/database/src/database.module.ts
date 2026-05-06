@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { DatabaseService } from './database.service';
-import { ConfigModule } from '@nestjs/config';
+import { SharedModule } from 'my-shared/shared';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [SharedModule],
   providers: [DatabaseService],
   exports: [DatabaseService],
 })

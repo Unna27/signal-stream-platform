@@ -60,7 +60,7 @@ export class ApiGatewayService {
     endTimestamp: number,
   ): Promise<ProcessedSignal[]> {
     this.logger.log(
-      `Fetching signals between ${startTimestamp} and ${endTimestamp}`,
+      `Fetching signals between ${new Date(startTimestamp).toLocaleString()} and ${new Date(endTimestamp).toLocaleString()}`,
     );
     try {
       const signals = await this.databaseService.getProcessedSignalsByDateRange(

@@ -7,6 +7,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger, OnModuleInit } from '@nestjs/common';
 import { KafkaService } from 'my-kafka/kafka';
+import { KafkaConfigService } from 'my-shared/shared';
 import { EachMessagePayload } from 'kafkajs';
 
 interface ProcessedSignal {
@@ -31,11 +32,15 @@ export class SignalsGateway
   server: Server;
 
   private readonly logger = new Logger(SignalsGateway.name);
-  private readonly outputTopic =
-    process.env.SIGNAL_OUTPUT_TOPIC || 'processed-signals';
+  private readonly outputTopic: string;
   private readonly gatewayGroupId = 'api-gateway-group';
 
-  constructor(private readonly kafkaService: KafkaService) {}
+  constructor(
+    private readonly kafkaService: KafkaService,
+    private readonly kafkaConfig: KafkaConfigService,
+  ) {
+    this.outputTopic = this.kafkaConfig.outputTopic;
+  }
 
   async onModuleInit() {
     this.logger.log('Initializing SignalsGateway...');
@@ -47,7 +52,8 @@ export class SignalsGateway
       this.logger.log(`Starting Kafka consumer for topic: ${this.outputTopic}`);
       await this.kafkaService.subscribe(
         this.outputTopic,
-        this.handleKafkaMessage.bind(this),
+        (messagePayload: EachMessagePayload) =>
+          this.handleKafkaMessage(messagePayload),
       );
     } catch (error) {
       this.logger.error(
@@ -68,9 +74,7 @@ export class SignalsGateway
         payload.message.value.toString(),
       ) as ProcessedSignal;
 
-      this.logger.debug(
-        `Received signal from Kafka: ${JSON.stringify(signal)}`,
-      );
+      this.logger.log(`Received signal from Kafka: ${JSON.stringify(signal)}`);
 
       // Broadcast to all connected WebSocket clients
       this.broadcastSignal(signal);
@@ -83,7 +87,7 @@ export class SignalsGateway
   }
 
   private broadcastSignal(signal: ProcessedSignal) {
-    this.logger.debug(
+    this.logger.log(
       `Broadcasting signal to ${this.server.engine.clientsCount} clients`,
     );
     this.server.emit('signal', signal);
