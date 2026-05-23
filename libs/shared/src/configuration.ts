@@ -7,6 +7,7 @@ export const configuration = () => ({
       10,
     ),
     auth_service_port: parseInt(process.env.AUTH_SERVICE_PORT ?? '3003', 10),
+    jwt_secret: process.env.JWT_SECRET ?? 'super-secret-key',
   },
   database: {
     host: process.env.DB_HOST ?? 'localhost',

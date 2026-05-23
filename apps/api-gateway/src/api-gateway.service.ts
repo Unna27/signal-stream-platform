@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from 'my-db/database';
+import { HttpService } from '@nestjs/axios';
 
 interface ProcessedSignal {
   id: string;
@@ -40,7 +41,7 @@ export class ApiGatewayService {
   async getSignal(signalId: string): Promise<ProcessedSignal | null> {
     this.logger.log(`Fetching signal with ID: ${signalId}`);
     try {
-      const signal = await this.databaseService.getProcessedSignal(signalId);
+      const signal = await this.databaseService.getProcessedSignal(signalId); // change it to http call to storage service
       if (!signal) {
         this.logger.warn(`Signal not found: ${signalId}`);
         return null;

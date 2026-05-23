@@ -21,25 +21,14 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
+    //"strictPropertyInitialization": false, // Disable strict property initialization
     "paths": {
-      "my-db/database": [
-        "libs/database/src"
-      ],
-      "my-db/database/*": [
-        "libs/database/src/*"
-      ],
-      "my-kafka/kafka": [
-        "libs/kafka/src"
-      ],
-      "my-kafka/kafka/*": [
-        "libs/kafka/src/*"
-      ],
-      "my-shared/shared": [
-        "libs/shared/src"
-      ],
-      "my-shared/shared/*": [
-        "libs/shared/src/*"
-      ]
+      "my-db/database": ["libs/database/src"],
+      "my-db/database/*": ["libs/database/src/*"],
+      "my-kafka/kafka": ["libs/kafka/src"],
+      "my-kafka/kafka/*": ["libs/kafka/src/*"],
+      "my-shared/shared": ["libs/shared/src"],
+      "my-shared/shared/*": ["libs/shared/src/*"]
     }
   }
 }

@@ -1,6 +1,8 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { Pool } from 'pg';
+import { DataSource, Repository, Between } from 'typeorm';
 import { DatabaseConfigService } from 'my-shared/shared';
+import { ProcessedSignalEntity } from './entities/processed-signal.entity';
+import { UserEntity } from './entities/user.entity';
 
 interface ProcessedSignal {
   id: string;
@@ -11,66 +13,43 @@ interface ProcessedSignal {
   processedAt: number;
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  password: string;
+  createdAt: Date;
+}
+
 @Injectable()
 export class DatabaseService implements OnModuleInit {
-  private pool!: Pool;
+  private dataSource!: DataSource;
+  private processedSignalRepository!: Repository<ProcessedSignalEntity>;
+  private userRepository!: Repository<UserEntity>;
   private readonly logger = new Logger(DatabaseService.name);
 
   constructor(private readonly dbConfig: DatabaseConfigService) {
-    this.pool = new Pool({
-      user: this.dbConfig.user ?? '',
+    this.dataSource = new DataSource({
+      type: 'postgres',
       host: this.dbConfig.host ?? 'localhost',
-      database: this.dbConfig.name ?? '',
+      port: this.dbConfig.port ?? 5434,
+      username: this.dbConfig.user ?? '',
       password: this.dbConfig.password ?? '',
-      port: this.dbConfig.port ?? 5432,
+      database: this.dbConfig.name ?? '',
+      entities: [ProcessedSignalEntity, UserEntity],
+      synchronize: true, // true for development; use migrations in production
     });
   }
 
   async onModuleInit() {
-    this.logger.log('Initializing database tables...');
-    await this.initializeSchema();
-  }
-
-  private async initializeSchema(): Promise<void> {
-    const client = await this.pool.connect();
-    try {
-      // Create processed_signals table if it doesn't exist
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS processed_signals (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          signal_id VARCHAR(255) NOT NULL UNIQUE,
-          value NUMERIC(10, 4) NOT NULL,
-          timestamp TIMESTAMP NOT NULL,
-          processed_value NUMERIC(10, 4) NOT NULL,
-          strength VARCHAR(10) NOT NULL CHECK (strength IN ('weak', 'medium', 'strong')),
-          processed_at TIMESTAMP NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-      `);
-
-      // Create index on signal_id for faster lookups
-      await client.query(`
-        CREATE INDEX IF NOT EXISTS idx_processed_signals_signal_id 
-        ON processed_signals(signal_id);
-      `);
-
-      // Create index on timestamp for time-range queries
-      await client.query(`
-        CREATE INDEX IF NOT EXISTS idx_processed_signals_timestamp 
-        ON processed_signals(timestamp);
-      `);
-
-      this.logger.log('✓ Database schema initialized successfully');
-    } catch (error) {
-      this.logger.error(
-        `Failed to initialize schema: ${error.message}`,
-        error.stack,
-      );
-      throw error;
-    } finally {
-      client.release();
-    }
+    this.logger.log('Initializing database connection...');
+    await this.dataSource.initialize();
+    this.processedSignalRepository = this.dataSource.getRepository(
+      ProcessedSignalEntity,
+    );
+    this.userRepository = this.dataSource.getRepository(UserEntity);
+    this.logger.log('✓ Database initialized successfully');
   }
 
   private isValidTimestamp(timestamp: number): boolean {
@@ -143,60 +122,53 @@ export class DatabaseService implements OnModuleInit {
       );
     }
 
-    const client = await this.pool.connect();
     try {
-      const result = await client.query(
-        `INSERT INTO processed_signals(signal_id, value, timestamp, processed_value, strength, processed_at)
-         VALUES($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (signal_id) DO UPDATE SET
-           value = $2,
-           processed_value = $4,
-           strength = $5,
-           processed_at = $6,
-           updated_at = CURRENT_TIMESTAMP
-         RETURNING id;`,
-        [
-          signal.id,
-          signal.value,
-          new Date(signal.timestamp),
-          signal.processedValue,
-          signal.strength,
-          new Date(signal.processedAt),
-        ],
+      await this.processedSignalRepository.upsert(
+        {
+          signalId: signal.id,
+          value: signal.value,
+          timestamp: new Date(signal.timestamp),
+          processedValue: signal.processedValue,
+          strength: signal.strength,
+          processedAt: new Date(signal.processedAt),
+        },
+        ['signalId'],
       );
 
-      this.logger.log(
-        `✓ Inserted/Updated signal ${signal.id} with database ID: ${result.rows[0].id}`,
-      );
+      this.logger.log(`✓ Inserted/Updated signal ${signal.id}`);
     } catch (error) {
       this.logger.error(
-        `Failed to insert signal ${signal.id}: ${error.message}`,
-        error.stack,
+        `Failed to insert signal ${signal.id}: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
-    } finally {
-      client.release();
     }
   }
 
   async getProcessedSignal(signalId: string): Promise<ProcessedSignal | null> {
-    const client = await this.pool.connect();
     try {
-      const result = await client.query(
-        `SELECT signal_id as id, value, timestamp, processed_value as "processedValue", 
-                strength, processed_at as "processedAt"
-         FROM processed_signals
-         WHERE signal_id = $1;`,
-        [signalId],
-      );
+      const entity = await this.processedSignalRepository.findOne({
+        where: { signalId },
+      });
 
-      if (result.rows.length === 0) {
+      if (!entity) {
         return null;
       }
 
-      return result.rows[0];
-    } finally {
-      client.release();
+      return {
+        id: entity.signalId,
+        value: entity.value,
+        timestamp: entity.timestamp.getTime(),
+        processedValue: entity.processedValue,
+        strength: entity.strength,
+        processedAt: entity.processedAt.getTime(),
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to get signal ${signalId}: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw error;
     }
   }
 
@@ -204,26 +176,132 @@ export class DatabaseService implements OnModuleInit {
     startTimestamp: number,
     endTimestamp: number,
   ): Promise<ProcessedSignal[]> {
-    const client = await this.pool.connect();
     try {
       console.log(startTimestamp, endTimestamp);
-      const result = await client.query(
-        `SELECT signal_id as id, value, timestamp, processed_value as "processedValue",
-                strength, processed_at as "processedAt"
-         FROM processed_signals
-         WHERE timestamp >= $1 AND timestamp <= $2
-         ORDER BY timestamp DESC;`,
-        [new Date(startTimestamp), new Date(endTimestamp)],
-      );
+      const entities = await this.processedSignalRepository.find({
+        where: {
+          timestamp: Between(new Date(startTimestamp), new Date(endTimestamp)),
+        },
+        order: { timestamp: 'DESC' },
+      });
 
-      return result.rows;
-    } finally {
-      client.release();
+      return entities.map((entity) => ({
+        id: entity.signalId,
+        value: entity.value,
+        timestamp: entity.timestamp.getTime(),
+        processedValue: entity.processedValue,
+        strength: entity.strength,
+        processedAt: entity.processedAt.getTime(),
+      }));
+    } catch (error) {
+      this.logger.error(
+        `Failed to get signals by date range: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw error;
+    }
+  }
+
+  // User methods
+  async insertUser(user: Omit<User, 'id' | 'createdAt'>) {
+    try {
+      const entity = this.userRepository.create({
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        password: user.password,
+      });
+      const savedEntity = await this.userRepository.save(entity);
+      return {
+        id: savedEntity.id,
+        name: savedEntity.name,
+        email: savedEntity.email,
+        role: savedEntity.role,
+        password: savedEntity.password,
+        createdAt: savedEntity.createdAt,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to insert user ${user.email}: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw error;
+    }
+  }
+
+  async getUserById(id: string): Promise<User | null> {
+    try {
+      const entity = await this.userRepository.findOne({ where: { id } });
+      if (!entity) return null;
+      return {
+        id: entity.id,
+        name: entity.name,
+        email: entity.email,
+        role: entity.role,
+        password: entity.password,
+        createdAt: entity.createdAt,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to get user ${id}: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw error;
+    }
+  }
+
+  async getUserByEmail(email: string) {
+    try {
+      const entity = await this.userRepository.findOne({ where: { email } });
+      if (!entity) return null;
+      return {
+        id: entity.id,
+        name: entity.name,
+        email: entity.email,
+        role: entity.role,
+        password: entity.password,
+        createdAt: entity.createdAt,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to get user by email ${email}: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw error;
+    }
+  }
+
+  async updateUser(
+    id: string,
+    updates: Partial<Omit<User, 'id' | 'createdAt'>>,
+  ): Promise<User | null> {
+    try {
+      await this.userRepository.update(id, updates);
+      return this.getUserById(id);
+    } catch (error) {
+      this.logger.error(
+        `Failed to update user ${id}: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw error;
+    }
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    try {
+      const result = await this.userRepository.delete(id);
+      return !!result.affected && result.affected > 0;
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete user ${id}: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw error;
     }
   }
 
   async close(): Promise<void> {
-    await this.pool.end();
-    this.logger.log('Database pool closed');
+    await this.dataSource.destroy();
+    this.logger.log('Database connection closed');
   }
 }
