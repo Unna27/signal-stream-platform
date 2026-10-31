@@ -72,7 +72,7 @@ try:
         print(f"✓ Message sent: {signal}")
         print(f"  Topic: {record_metadata.topic}, Partition: {record_metadata.partition}, Offset: {record_metadata.offset}")
         
-        # Wait 30 seconds before sending next message
+        # Wait 60 seconds before sending next message
         time.sleep(60)
     
 except Exception as e:

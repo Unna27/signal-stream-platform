@@ -6,10 +6,12 @@ import { UserEntity } from './entities/user.entity';
 
 interface ProcessedSignal {
   id: string;
+  deviceId: string;
   value: number;
+  status: 'NORMAL' | 'ANOMALY' | 'INSUFFICIENT_DATA';
+  anomalyType: 'SPIKE' | 'DROP' | 'FLAT' | null;
   timestamp: number;
   processedValue: number;
-  strength: 'weak' | 'medium' | 'strong';
   processedAt: number;
 }
 
@@ -38,7 +40,7 @@ export class DatabaseService implements OnModuleInit {
       password: this.dbConfig.password ?? '',
       database: this.dbConfig.name ?? '',
       entities: [ProcessedSignalEntity, UserEntity],
-      synchronize: true, // true for development; use migrations in production
+      synchronize: true, // true for development, synchronize changes in fields; use migrations in production
     });
   }
 
@@ -76,6 +78,11 @@ export class DatabaseService implements OnModuleInit {
       errors.push('Signal ID must be a non-empty string');
     }
 
+    // Validate deviceId
+    if (!signal.deviceId || typeof signal.deviceId !== 'string') {
+      errors.push('Device ID must be a non-empty string');
+    }
+
     // Validate value
     if (typeof signal.value !== 'number' || isNaN(signal.value)) {
       errors.push('Value must be a valid number');
@@ -96,10 +103,19 @@ export class DatabaseService implements OnModuleInit {
       errors.push('Processed value must be a valid number');
     }
 
-    // Validate strength
-    if (!['weak', 'medium', 'strong'].includes(signal.strength)) {
-      errors.push('Strength must be one of: weak, medium, strong');
+    // Validate status
+    if (!['NORMAL', 'ANOMALY', 'INSUFFICIENT_DATA'].includes(signal.status)) {
+      errors.push('Status must be one of: NORMAL, ANOMALY, INSUFFICIENT_DATA');
     }
+
+    // Validate anomalyType
+    if (
+      signal.anomalyType !== null &&
+      !['SPIKE', 'DROP', 'FLAT'].includes(signal.anomalyType)
+    ) {
+      errors.push('Anomaly type must be one of: SPIKE, DROP, FLAT, or null');
+    }
+
     // Validate processedAt
     if (!this.isValidTimestamp(signal.processedAt)) {
       errors.push('ProcessedAt must be a valid Unix timestamp (milliseconds)');
@@ -126,13 +142,15 @@ export class DatabaseService implements OnModuleInit {
       await this.processedSignalRepository.upsert(
         {
           signalId: signal.id,
+          deviceId: signal.deviceId,
           value: signal.value,
+          status: signal.status,
+          anomalyType: signal.anomalyType,
           timestamp: new Date(signal.timestamp),
           processedValue: signal.processedValue,
-          strength: signal.strength,
           processedAt: new Date(signal.processedAt),
         },
-        ['signalId'],
+        ['signalId'], // Upsert based on signalId to avoid duplicates (Idempotency)
       );
 
       this.logger.log(`✓ Inserted/Updated signal ${signal.id}`);
@@ -157,10 +175,12 @@ export class DatabaseService implements OnModuleInit {
 
       return {
         id: entity.signalId,
+        deviceId: entity.deviceId,
         value: entity.value,
+        status: entity.status,
+        anomalyType: entity.anomalyType,
         timestamp: entity.timestamp.getTime(),
         processedValue: entity.processedValue,
-        strength: entity.strength,
         processedAt: entity.processedAt.getTime(),
       };
     } catch (error) {
@@ -187,15 +207,50 @@ export class DatabaseService implements OnModuleInit {
 
       return entities.map((entity) => ({
         id: entity.signalId,
+        deviceId: entity.deviceId,
         value: entity.value,
         timestamp: entity.timestamp.getTime(),
         processedValue: entity.processedValue,
-        strength: entity.strength,
         processedAt: entity.processedAt.getTime(),
+        status: entity.status,
+        anomalyType: entity.anomalyType,
       }));
     } catch (error) {
       this.logger.error(
         `Failed to get signals by date range: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw error;
+    }
+  }
+
+  async getLatestProcessedSignalValues(
+    deviceId: string,
+    limit: number,
+  ): Promise<number[]> {
+    if (!Number.isInteger(limit) || limit <= 0) {
+      throw new RangeError('Signal history limit must be a positive integer');
+    }
+
+    try {
+      const entities = await this.processedSignalRepository.find({
+        where: { deviceId },
+        select: ['value', 'status', 'timestamp', 'id'],
+        order: { timestamp: 'DESC', id: 'DESC' },
+        take: limit * 3, // to account for filtering out anomalies and insufficient data, fetch more than needed
+      });
+
+      return entities
+        .filter(
+          (entity) =>
+            entity.status === 'NORMAL' || entity.status === 'INSUFFICIENT_DATA',
+        )
+        .slice(0, limit)
+        .map((entity) => Number(entity.value))
+        .filter(Number.isFinite);
+    } catch (error) {
+      this.logger.error(
+        `Failed to get latest signals for device ${deviceId}: ${(error as Error).message}`,
         (error as Error).stack,
       );
       throw error;

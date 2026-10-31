@@ -30,9 +30,15 @@ interface SignalStats {
   maxValue: number;
   minProcessedValue: number;
   maxProcessedValue: number;
-  weakCount: number;
-  mediumCount: number;
-  strongCount: number;
+  normalCount: number;
+  anomalyCount: number;
+  missingDataCount: number;
+  anomalyTypeCounts: {
+    SPIKE: number;
+    DROP: number;
+    FLAT: number;
+    UNKNOWN: number;
+  };
   signalsPerSecond: number;
 }
 
@@ -50,7 +56,7 @@ interface SignalStats {
 })
 export class SignalDashboardComponent implements OnInit, OnDestroy {
   @ViewChild('valueChart') valueChart!: BaseChartDirective;
-  @ViewChild('strengthChart') strengthChart!: BaseChartDirective;
+  @ViewChild('statusChart') statusChart!: BaseChartDirective;
   @ViewChild('rateChart') rateChart!: BaseChartDirective;
 
   currentSignal: ProcessedSignal | null = null;
@@ -68,9 +74,15 @@ export class SignalDashboardComponent implements OnInit, OnDestroy {
     maxValue: 0,
     minProcessedValue: 0,
     maxProcessedValue: 0,
-    weakCount: 0,
-    mediumCount: 0,
-    strongCount: 0,
+    normalCount: 0,
+    anomalyCount: 0,
+    missingDataCount: 0,
+    anomalyTypeCounts: {
+      SPIKE: 0,
+      DROP: 0,
+      FLAT: 0,
+      UNKNOWN: 0,
+    },
     signalsPerSecond: 0,
   };
 
@@ -103,13 +115,13 @@ export class SignalDashboardComponent implements OnInit, OnDestroy {
     ],
   };
 
-  signalStrengthChartData: ChartData<'doughnut'> = {
-    labels: ['Weak', 'Medium', 'Strong'],
+  signalStatusChartData: ChartData<'doughnut'> = {
+    labels: ['Normal', 'Anomaly', 'Missing Data'],
     datasets: [
       {
-        label: 'Signal Strength Distribution',
+        label: 'Signal Status Distribution',
         data: [0, 0, 0],
-        backgroundColor: ['#ef4444', '#f59e0b', '#10b981'],
+        backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
       },
     ],
   };
@@ -154,7 +166,7 @@ export class SignalDashboardComponent implements OnInit, OnDestroy {
     },
   };
 
-  signalStrengthChartOptions: ChartConfiguration<'doughnut'>['options'] = {
+  signalStatusChartOptions: ChartConfiguration<'doughnut'>['options'] = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -164,7 +176,7 @@ export class SignalDashboardComponent implements OnInit, OnDestroy {
       },
       title: {
         display: true,
-        text: 'Signal Strength Distribution',
+        text: 'Signal Status Distribution',
       },
       tooltip: {
         callbacks: {
@@ -220,7 +232,7 @@ export class SignalDashboardComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.websocketService.connect().subscribe({
       next: (connected) => {
-        console.log('Connected to signal gateway');
+        console.log('Connected to signal gateway', connected);
       },
       error: (error) => {
         console.error('Failed to connect to gateway:', error);
@@ -232,7 +244,10 @@ export class SignalDashboardComponent implements OnInit, OnDestroy {
       .subscribe((signal) => {
         this.ngZone.run(() => {
           if (!signal) return;
-
+          console.log(
+            'Received signal from WebSocket:',
+            JSON.stringify(signal),
+          );
           this.currentSignal = {
             ...signal,
             timestamp: Number(signal.timestamp),
@@ -247,7 +262,7 @@ export class SignalDashboardComponent implements OnInit, OnDestroy {
 
           const oneMinuteAgo = Date.now() - 60000;
           this.signalTimestamps = this.signalTimestamps.filter(
-            (ts) => ts > oneMinuteAgo,
+            (ts) => ts > oneMinuteAgo, // keep only timestamps from the last 60 seconds
           );
 
           this.updateStats();
@@ -411,7 +426,7 @@ export class SignalDashboardComponent implements OnInit, OnDestroy {
 
     const values = allSignals.map((s) => Number(s.value));
     const processedValues = allSignals.map((s) => Number(s.processedValue));
-    const strengths = allSignals.map((s) => s.strength);
+    const statuses = allSignals.map((s) => s.status);
 
     this.stats = {
       count: allSignals.length,
@@ -422,39 +437,51 @@ export class SignalDashboardComponent implements OnInit, OnDestroy {
       maxValue: Math.max(...values),
       minProcessedValue: Math.min(...processedValues),
       maxProcessedValue: Math.max(...processedValues),
-      weakCount: strengths.filter((s) => s === 'weak').length,
-      mediumCount: strengths.filter((s) => s === 'medium').length,
-      strongCount: strengths.filter((s) => s === 'strong').length,
-      signalsPerSecond:
-        this.signalTimestamps.length > 0
-          ? ((this.signalTimestamps.length / 60).toFixed(2) as any)
-          : 0,
+      normalCount: statuses.filter((s) => s === 'NORMAL').length,
+      anomalyCount: statuses.filter((s) => s === 'ANOMALY').length,
+      missingDataCount: statuses.filter((s) => s === 'INSUFFICIENT_DATA')
+        .length,
+      anomalyTypeCounts: {
+        SPIKE: allSignals.filter(
+          (s) => s.status === 'ANOMALY' && s.anomalyType === 'SPIKE',
+        ).length,
+        DROP: allSignals.filter(
+          (s) => s.status === 'ANOMALY' && s.anomalyType === 'DROP',
+        ).length,
+        FLAT: allSignals.filter(
+          (s) => s.status === 'ANOMALY' && s.anomalyType === 'FLAT',
+        ).length,
+        UNKNOWN: allSignals.filter(
+          (s) => s.status === 'ANOMALY' && s.anomalyType === null,
+        ).length,
+      },
+      signalsPerSecond: this.signalTimestamps.length,
     };
 
-    this.signalStrengthChartData.datasets[0].data = [
-      this.stats.weakCount,
-      this.stats.mediumCount,
-      this.stats.strongCount,
+    this.signalStatusChartData.datasets[0].data = [
+      this.stats.normalCount,
+      this.stats.anomalyCount,
+      this.stats.missingDataCount,
     ];
     console.log(
       'Updated stats:',
-      this.stats.weakCount,
-      this.stats.mediumCount,
-      this.stats.strongCount,
+      this.stats.normalCount,
+      this.stats.anomalyCount,
+      this.stats.missingDataCount,
     );
-    if (this.strengthChart?.chart) {
-      this.strengthChart.chart.update();
+    if (this.statusChart?.chart) {
+      this.statusChart.chart?.update();
     }
   }
 
-  getStrengthColor(strength: string): string {
-    switch (strength) {
-      case 'weak':
-        return '#ef4444';
-      case 'medium':
-        return '#f59e0b';
-      case 'strong':
+  getSignalStatusColor(status: string): string {
+    switch (status) {
+      case 'NORMAL':
         return '#10b981';
+      case 'ANOMALY':
+        return '#ef4444';
+      case 'INSUFFICIENT_DATA':
+        return '#f59e0b';
       default:
         return '#808080';
     }

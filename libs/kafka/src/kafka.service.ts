@@ -17,9 +17,9 @@ import { KafkaConfigService } from 'my-shared/shared';
 @Injectable()
 export class KafkaService implements OnModuleInit, OnModuleDestroy {
   private kafka: Kafka;
-  private consumer: Consumer;
-  private producer: Producer;
-  private admin: Admin;
+  private consumer!: Consumer;
+  private producer!: Producer;
+  private admin!: Admin;
   private readonly logger = new Logger(KafkaService.name);
   private readonly numPartitions = 2; // Configure for 2 partitions
   private readonly replicationFactor = 1;
@@ -75,42 +75,37 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
       this.kafkaConfig.failedTopic, // 'storage-signals-failed',
     ];
 
-    try {
-      const existingTopics = await this.admin.fetchTopicMetadata({
-        topics,
-      });
+    const existingTopicNames = await this.admin.listTopics();
+    const topicsToCreate = topics.filter(
+      (topic) => !existingTopicNames.includes(topic),
+    );
 
-      const existingTopicNames = existingTopics.topics.map((t) => t.name);
-      const topicsToCreate = topics.filter(
-        (topic) => !existingTopicNames.includes(topic),
+    if (topicsToCreate.length === 0) {
+      this.logger.log('✓ All configured topics already exist');
+      return;
+    }
+
+    const created = await this.admin.createTopics({
+      topics: topicsToCreate.map((topic) => ({
+        topic,
+        numPartitions: this.numPartitions,
+        replicationFactor: this.replicationFactor,
+        configEntries: [
+          {
+            name: 'retention.ms',
+            value: '86400000', // 24 hours
+          },
+        ],
+      })),
+    });
+
+    if (created) {
+      this.logger.log(
+        `✓ Created topics with ${this.numPartitions} partitions: ${topicsToCreate.join(', ')}`,
       );
-
-      if (topicsToCreate.length > 0) {
-        await this.admin.createTopics({
-          topics: topicsToCreate.map((topic) => ({
-            topic,
-            numPartitions: this.numPartitions,
-            replicationFactor: this.replicationFactor,
-            configEntries: [
-              {
-                name: 'retention.ms',
-                value: '86400000', // 24 hours
-              },
-            ],
-          })),
-        });
-
-        this.logger.log(
-          `✓ Created topics with ${this.numPartitions} partitions: ${topicsToCreate.join(', ')}`,
-        );
-      } else {
-        this.logger.log(
-          `✓ All topics already exist with proper partition configuration`,
-        );
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Topic creation warning (may already exist): ${error.message}`,
+    } else {
+      this.logger.log(
+        `✓ Topics already existed or were created concurrently: ${topicsToCreate.join(', ')}`,
       );
     }
   }

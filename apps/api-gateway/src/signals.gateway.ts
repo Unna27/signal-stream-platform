@@ -15,7 +15,8 @@ interface ProcessedSignal {
   value: number;
   timestamp: number;
   processedValue: number;
-  strength: 'weak' | 'medium' | 'strong';
+  status: 'NORMAL' | 'ANOMALY' | 'INSUFFICIENT_DATA';
+  anomalyType: 'SPIKE' | 'DROP' | 'FLAT' | null;
   processedAt: number;
 }
 
@@ -29,7 +30,7 @@ export class SignalsGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit
 {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private readonly logger = new Logger(SignalsGateway.name);
   private readonly outputTopic: string;
@@ -57,8 +58,8 @@ export class SignalsGateway
       );
     } catch (error) {
       this.logger.error(
-        `Failed to start Kafka consumer: ${error.message}`,
-        error.stack,
+        `Failed to start Kafka consumer: ${(error as Error).message}`,
+        (error as Error).stack,
       );
     }
   }
@@ -71,7 +72,7 @@ export class SignalsGateway
       }
 
       const signal = JSON.parse(
-        payload.message.value.toString(),
+        payload.message.value?.toString(),
       ) as ProcessedSignal;
 
       this.logger.log(`Received signal from Kafka: ${JSON.stringify(signal)}`);
@@ -80,8 +81,8 @@ export class SignalsGateway
       this.broadcastSignal(signal);
     } catch (error) {
       this.logger.error(
-        `Failed to process Kafka message: ${error.message}`,
-        error.stack,
+        `Failed to process Kafka message: ${(error as Error).message}`,
+        (error as Error).stack,
       );
     }
   }

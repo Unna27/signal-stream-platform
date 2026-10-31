@@ -145,6 +145,7 @@ describe('Storage service integration: Kafka -> DB', () => {
     // create a test signal
     const testSignal = {
       id: 'signal-test-1',
+      deviceId: 'device-test-1',
       value: 12.34,
       timestamp: Date.now(),
       processedValue: 13.37,

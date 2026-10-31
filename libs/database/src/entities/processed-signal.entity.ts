@@ -9,35 +9,47 @@ import {
 
 @Entity('processed_signals')
 @Index(['signalId'])
-@Index(['timestamp'])
+@Index(['deviceId', 'timestamp'])
 export class ProcessedSignalEntity {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
   @Column({ name: 'signal_id', unique: true })
-  signalId: string;
+  signalId!: string;
+
+  @Column({ name: 'device_id' })
+  deviceId!: string;
 
   @Column('decimal', { precision: 10, scale: 4 })
-  value: number;
+  value!: number;
 
   @Column('timestamp')
-  timestamp: Date;
+  timestamp!: Date;
 
   @Column('decimal', { precision: 10, scale: 4, name: 'processed_value' })
-  processedValue: number;
+  processedValue!: number;
 
   @Column({
     type: 'enum',
-    enum: ['weak', 'medium', 'strong'],
+    enum: ['NORMAL', 'ANOMALY', 'INSUFFICIENT_DATA'],
+    default: 'NORMAL',
   })
-  strength: 'weak' | 'medium' | 'strong';
+  status!: 'NORMAL' | 'ANOMALY' | 'INSUFFICIENT_DATA';
+
+  @Column({
+    name: 'anomaly_type',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  anomalyType!: 'SPIKE' | 'DROP' | 'FLAT' | null;
 
   @Column('timestamp', { name: 'processed_at' })
-  processedAt: Date;
+  processedAt!: Date;
 
   @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
-  updatedAt: Date;
+  updatedAt!: Date;
 }

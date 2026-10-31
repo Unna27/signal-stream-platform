@@ -46,6 +46,10 @@
         <p class="value">{{ currentSignal.id }}</p>
       </div>
       <div class="info-card">
+        <p class="label">Device ID</p>
+        <p class="value">{{ currentSignal.deviceId }}</p>
+      </div>
+      <div class="info-card">
         <p class="label">Original Value</p>
         <p class="value">{{ currentSignal.value.toFixed(4) }}</p>
       </div>
@@ -54,12 +58,12 @@
         <p class="value">{{ currentSignal.processedValue.toFixed(4) }}</p>
       </div>
       <div class="info-card">
-        <p class="label">Strength</p>
+        <p class="label">Status</p>
         <p
           class="value"
-          [style.color]="getStrengthColor(currentSignal.strength)"
+          [style.color]="getSignalStatusColor(currentSignal.status)"
         >
-          {{ currentSignal.strength | uppercase }}
+          {{ currentSignal.status | uppercase }}
         </p>
       </div>
       <div class="info-card">
@@ -102,20 +106,40 @@
         <p class="stat-value">{{ stats.maxValue.toFixed(3) }}</p>
       </div>
       <div class="stat-card">
-        <p class="stat-label">Signals/Sec</p>
+        <p class="stat-label">Signals/sec</p>
         <p class="stat-value">{{ stats.signalsPerSecond }}</p>
       </div>
       <div class="stat-card">
-        <p class="stat-label">Weak Signals</p>
-        <p class="stat-value" style="color: #ef4444">{{ stats.weakCount }}</p>
+        <p class="stat-label">Normal Signals Count</p>
+        <p class="stat-value">{{ stats.normalCount }}</p>
       </div>
       <div class="stat-card">
-        <p class="stat-label">Medium Signals</p>
-        <p class="stat-value" style="color: #f59e0b">{{ stats.mediumCount }}</p>
+        <p class="stat-label">Anomaly Signals</p>
+        <p class="stat-value" style="color: #ef4444">
+          {{ stats.anomalyCount }}
+        </p>
       </div>
       <div class="stat-card">
-        <p class="stat-label">Strong Signals</p>
-        <p class="stat-value" style="color: #10b981">{{ stats.strongCount }}</p>
+        <p class="stat-label">Missing Data Signals</p>
+        <p class="stat-value" style="color: #f59e0b">
+          {{ stats.missingDataCount }}
+        </p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">SPIKE Signals Count</p>
+        <p class="stat-value">{{ stats.anomalyTypeCounts.SPIKE }}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">DROP Signals Count</p>
+        <p class="stat-value">{{ stats.anomalyTypeCounts.DROP }}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">FLAT Signals Count</p>
+        <p class="stat-value">{{ stats.anomalyTypeCounts.FLAT }}</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">UNKNOWN Signals Count</p>
+        <p class="stat-value">{{ stats.anomalyTypeCounts.UNKNOWN }}</p>
       </div>
     </div>
   </div>
@@ -140,8 +164,8 @@
           #strengthChart
           baseChart
           [type]="'doughnut'"
-          [data]="signalStrengthChartData"
-          [options]="signalStrengthChartOptions"
+          [data]="signalStatusChartData"
+          [options]="signalStatusChartOptions"
         ></canvas>
       </div>
     </div>

@@ -120,6 +120,27 @@ source venv/bin/activate   # or venv\Scripts\activate (Windows)
 python producer.py
 ```
 
+To generate signals from `producer_iot.py`, specify one or more devices. Each
+round sends one signal for every configured device; patterns can be set per
+device or inherited from `--pattern`:
+
+```bash
+python -u producer_iot.py \
+  --device device-001:normal \
+  --device device-002:spike \
+  --device device-003:drop \
+  --device device-004:flat \
+  --device device-005:normal \
+  --count 10 \
+  --interval 60
+```
+
+For one device, use the existing single-device options and choose its pattern:
+
+```bash
+python producer_iot.py --device-id device-003 --pattern drop --count 10
+```
+
 ---
 
 ### 4. Start Angular dashboard

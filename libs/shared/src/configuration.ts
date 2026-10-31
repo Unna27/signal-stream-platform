@@ -14,7 +14,7 @@ export const configuration = () => ({
     port: parseInt(process.env.DB_PORT ?? '5434', 10),
     user: process.env.DB_USER ?? 'user',
     password: process.env.DB_PASSWORD ?? 'pass',
-    name: process.env.DB_NAME ?? 'signal-stream-platform',
+    name: process.env.DB_NAME ?? 'signal_stream_platform',
   },
   kafka: {
     broker: process.env.KAFKA_BROKER ?? 'localhost:9092',

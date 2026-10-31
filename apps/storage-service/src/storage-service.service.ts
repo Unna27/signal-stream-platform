@@ -6,10 +6,12 @@ import { EachMessagePayload } from 'kafkajs';
 
 interface ProcessedSignal {
   id: string;
+  deviceId: string;
   value: number;
+  status: 'NORMAL' | 'ANOMALY' | 'INSUFFICIENT_DATA';
+  anomalyType: 'SPIKE' | 'DROP' | 'FLAT' | null;
   timestamp: number;
   processedValue: number;
-  strength: 'weak' | 'medium' | 'strong';
   processedAt: number;
 }
 
@@ -47,8 +49,8 @@ export class StorageServiceService implements OnModuleInit {
       );
     } catch (error) {
       this.logger.error(
-        `Failed to start consuming from ${this.outputTopic}: ${error.message}`,
-        error.stack,
+        `Failed to start consuming from ${this.outputTopic}: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }
@@ -67,7 +69,7 @@ export class StorageServiceService implements OnModuleInit {
       ) as ProcessedSignal;
 
       this.logger.log(
-        `[${payload.topic}] Received processed signal: ID=${signalData.id}, Strength=${signalData.strength}`,
+        `[${payload.topic}] Received processed signal: ID=${signalData.id}, Status=${signalData.status}`,
       );
 
       // Validate and store in database
@@ -80,12 +82,12 @@ export class StorageServiceService implements OnModuleInit {
     } catch (error) {
       this.errorCount++;
       this.logger.error(
-        `Failed to process and store signal: ${error.message}`,
-        error.stack,
+        `Failed to process and store signal: ${(error as Error).message}`,
+        (error as Error).stack,
       );
 
       // Produce failed signal to failed topic
-      await this.produceFailedSignal(payload, error);
+      await this.produceFailedSignal(payload, error as Error);
     }
   }
 
@@ -115,8 +117,8 @@ export class StorageServiceService implements OnModuleInit {
       );
     } catch (produceError) {
       this.logger.error(
-        `Failed to produce error signal to ${this.failedSignalsTopic}: ${produceError.message}`,
-        produceError.stack,
+        `Failed to produce error signal to ${this.failedSignalsTopic}: ${(produceError as Error).message}`,
+        (produceError as Error).stack,
       );
     }
   }
@@ -151,7 +153,8 @@ export class StorageServiceService implements OnModuleInit {
       return signal;
     } catch (error) {
       this.logger.error(
-        `Failed to retrieve signal ${signalId}: ${error.message}`,
+        `Failed to retrieve signal ${signalId}: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }
@@ -175,7 +178,8 @@ export class StorageServiceService implements OnModuleInit {
       return signals;
     } catch (error) {
       this.logger.error(
-        `Failed to retrieve signals by date range: ${error.message}`,
+        `Failed to retrieve signals by date range: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }

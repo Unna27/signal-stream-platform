@@ -2,16 +2,19 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { KafkaService } from 'my-kafka/kafka';
 import { KafkaConfigService } from 'my-shared/shared';
 import { EachMessagePayload } from 'kafkajs';
+import { AnomalyDetectorService } from './anomaly-detector/anomaly-detector.service';
 
 interface Signal {
   id: string;
+  deviceId: string;
   value: number;
   timestamp: number;
 }
 
 interface ProcessedSignal extends Signal {
   processedValue: number;
-  strength: 'weak' | 'medium' | 'strong';
+  status: 'NORMAL' | 'ANOMALY' | 'INSUFFICIENT_DATA';
+  anomalyType: 'SPIKE' | 'DROP' | 'FLAT' | null;
   processedAt: number;
 }
 
@@ -24,6 +27,7 @@ export class SignalProcessorService implements OnModuleInit {
   constructor(
     private readonly kafkaService: KafkaService,
     private readonly kafkaConfig: KafkaConfigService,
+    private readonly anomalyDetectorService: AnomalyDetectorService,
   ) {
     this.inputTopic = this.kafkaConfig.inputTopic;
     this.outputTopic = this.kafkaConfig.outputTopic;
@@ -51,25 +55,28 @@ export class SignalProcessorService implements OnModuleInit {
       const signal = JSON.parse(payload.message.value?.toString()) as Signal;
       this.logger.log(`Received signal: ${JSON.stringify(signal)}`);
 
-      const processedSignal = this.processSignal(signal);
+      const processedSignal = await this.processSignal(signal);
       await this.produceProcessedSignal(processedSignal);
     } catch (error) {
       this.logger.error(
-        `Failed to process message: ${error.message}`,
-        error.stack,
+        `Failed to process message: ${(error as Error).message}`,
+        (error as Error).stack,
       );
     }
   }
 
-  private processSignal(signal: Signal): ProcessedSignal {
+  private async processSignal(signal: Signal): Promise<ProcessedSignal> {
     const processedValue = this.applySmoothing(signal.value);
-    const strength =
-      processedValue < 7 ? 'weak' : processedValue < 14 ? 'medium' : 'strong';
+    const detection = await this.anomalyDetectorService.detect(
+      signal.deviceId,
+      processedValue,
+    );
 
     return {
       ...signal,
       processedValue,
-      strength,
+      status: detection.status,
+      anomalyType: detection.anomalyType,
       processedAt: Date.now(),
     };
   }
@@ -92,8 +99,8 @@ export class SignalProcessorService implements OnModuleInit {
       );
     } catch (error) {
       this.logger.error(
-        `Failed to produce processed signal: ${error.message}`,
-        error.stack,
+        `Failed to produce processed signal: ${(error as Error).message}`,
+        (error as Error).stack,
       );
     }
   }

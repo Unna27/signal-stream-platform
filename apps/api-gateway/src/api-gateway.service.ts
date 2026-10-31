@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from 'my-db/database';
-import { HttpService } from '@nestjs/axios';
 
 interface ProcessedSignal {
   id: string;
   value: number;
   timestamp: number;
   processedValue: number;
-  strength: 'weak' | 'medium' | 'strong';
+  status: 'NORMAL' | 'ANOMALY' | 'INSUFFICIENT_DATA';
+  anomalyType: 'SPIKE' | 'DROP' | 'FLAT' | null;
   processedAt: number;
 }
 
@@ -19,9 +19,15 @@ export interface SignalStatistics {
   maxValue: number;
   minProcessedValue: number;
   maxProcessedValue: number;
-  weakCount: number;
-  mediumCount: number;
-  strongCount: number;
+  normalCount: number;
+  anomalyCount: number;
+  missingDataCount: number;
+  anomalyTypeCounts: {
+    SPIKE: number;
+    DROP: number;
+    FLAT: number;
+    UNKNOWN: number;
+  };
   timeRange: {
     start: number;
     end: number;
@@ -49,8 +55,8 @@ export class ApiGatewayService {
       return signal;
     } catch (error) {
       this.logger.error(
-        `Failed to fetch signal ${signalId}: ${error.message}`,
-        error.stack,
+        `Failed to fetch signal ${signalId}: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }
@@ -72,13 +78,14 @@ export class ApiGatewayService {
       return signals;
     } catch (error) {
       this.logger.error(
-        `Failed to fetch signals by date range: ${error.message}`,
-        error.stack,
+        `Failed to fetch signals by date range: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }
   }
 
+  // not used in dashboard, but can be used in future for analytics or reporting
   async getStatistics(
     startTimestamp: number,
     endTimestamp: number,
@@ -101,16 +108,22 @@ export class ApiGatewayService {
           maxValue: 0,
           minProcessedValue: 0,
           maxProcessedValue: 0,
-          weakCount: 0,
-          mediumCount: 0,
-          strongCount: 0,
+          normalCount: 0,
+          anomalyCount: 0,
+          missingDataCount: 0,
+          anomalyTypeCounts: {
+            SPIKE: 0,
+            DROP: 0,
+            FLAT: 0,
+            UNKNOWN: 0,
+          },
           timeRange: { start: startTimestamp, end: endTimestamp },
         };
       }
 
       const values = signals.map((s) => s.value);
       const processedValues = signals.map((s) => s.processedValue);
-      const strengths = signals.map((s) => s.strength);
+      const statuses = signals.map((s) => s.status);
 
       const stats: SignalStatistics = {
         count: signals.length,
@@ -121,9 +134,24 @@ export class ApiGatewayService {
         maxValue: Math.max(...values),
         minProcessedValue: Math.min(...processedValues),
         maxProcessedValue: Math.max(...processedValues),
-        weakCount: strengths.filter((s) => s === 'weak').length,
-        mediumCount: strengths.filter((s) => s === 'medium').length,
-        strongCount: strengths.filter((s) => s === 'strong').length,
+        normalCount: statuses.filter((s) => s === 'NORMAL').length,
+        anomalyCount: statuses.filter((s) => s === 'ANOMALY').length,
+        missingDataCount: statuses.filter((s) => s === 'INSUFFICIENT_DATA')
+          .length,
+        anomalyTypeCounts: {
+          SPIKE: signals.filter(
+            (s) => s.status === 'ANOMALY' && s.anomalyType === 'SPIKE',
+          ).length,
+          DROP: signals.filter(
+            (s) => s.status === 'ANOMALY' && s.anomalyType === 'DROP',
+          ).length,
+          FLAT: signals.filter(
+            (s) => s.status === 'ANOMALY' && s.anomalyType === 'FLAT',
+          ).length,
+          UNKNOWN: signals.filter(
+            (s) => s.status === 'ANOMALY' && s.anomalyType === null,
+          ).length,
+        },
         timeRange: { start: startTimestamp, end: endTimestamp },
       };
 
@@ -131,8 +159,8 @@ export class ApiGatewayService {
       return stats;
     } catch (error) {
       this.logger.error(
-        `Failed to calculate statistics: ${error.message}`,
-        error.stack,
+        `Failed to calculate statistics: ${(error as Error).message}`,
+        (error as Error).stack,
       );
       throw error;
     }

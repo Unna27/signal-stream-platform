@@ -31,7 +31,7 @@ export class AuthController {
 
   @UseGuards(AuthGuard('jwt')) //protecting this route with JWT authentication guard, only authenticated users can access it or simply AuthGuard() will work as we set default strategy to JWT in auth.module.ts
   @Get('profile')
-  getProfile(@Request() req) {
+  getProfile(@Request() req: any) {
     console.log('Retrieving profile for user:', req.user); // user object holds userId, email and role as we validate and attach it to the request in jwt.strategy.ts
     return req.user;
   }
